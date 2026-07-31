@@ -1,0 +1,30 @@
+services:
+  pantau:
+    container_name: pantau-audit
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    ports:
+      - "8082:80"
+
+    volumes:
+      - ./app:/var/www/html/app
+
+    env_file:
+      - app/.env
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost/" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+    networks:
+      - pantau-network
+
+networks:
+  pantau-network:
+    driver: bridge
