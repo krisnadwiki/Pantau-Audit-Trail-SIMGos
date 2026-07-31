@@ -60,11 +60,11 @@ Platform monitoring terpadu untuk **audit trail**, **aktivitas pengguna**, dan *
 
 ### Halaman Audit Trail
 
-![Dashboard](img\audit_trail_page.png)
+![Dashboard](img/audit_trail_page.png)
 
 ### Halaman Audit Trail Lihat Detil
 
-![Dashboard](img\audit_trail_page_detil.png)
+![Dashboard](img/audit_trail_page_detil.png)
 
 ---
 
