@@ -48,6 +48,26 @@ Platform monitoring terpadu untuk **audit trail**, **aktivitas pengguna**, dan *
 
 ---
 
+## User Interface
+
+### Login
+
+![Login](img/login_page.png)
+
+### Dashboard
+
+![Dashboard](img/dashboard.png)
+
+### Halaman Audit Trail
+
+![Dashboard](img\audit_trail_page.png)
+
+### Halaman Audit Trail Lihat Detil
+
+![Dashboard](img\audit_trail_page_detil.png)
+
+---
+
 # 1. Instalasi Docker
 
 ## 1.1 Hapus Docker Lama
