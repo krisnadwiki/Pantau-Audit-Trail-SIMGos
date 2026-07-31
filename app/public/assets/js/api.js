@@ -10,6 +10,7 @@ window.API = (function() {
         params.action = action;
         const qs = new URLSearchParams(params).toString();
         const res = await fetch('/api/audit.php?' + qs, {
+            credentials: 'same-origin',
             headers: { 'Accept': 'application/json' }
         });
         const text = await res.text();
@@ -20,7 +21,7 @@ window.API = (function() {
             throw new Error('Response API tidak valid: ' + text.replace(/<[^>]*>/g, '').trim().substring(0, 120));
         }
         if (!res.ok) {
-            throw new Error(data.message || 'HTTP ' + res.status);
+            throw new Error('HTTP ' + res.status + ': ' + (data.message || 'Unknown error'));
         }
         return data;
     }

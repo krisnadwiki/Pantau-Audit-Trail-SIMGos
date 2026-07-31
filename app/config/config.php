@@ -6,6 +6,9 @@
 
 require_once __DIR__ . '/env.php';
 
+// Load .env dari root aplikasi (HARUS sebelum define konstanta)
+loadEnv(__DIR__ . '/../.env');
+
 // Konstanta aplikasi
 define('APP_NAME',        env('APP_NAME',    'PANTAU - Pusat Analitik Transaksi dan Aktivitas User'));
 define('APP_SHORT',       'PANTAU');
@@ -18,17 +21,12 @@ define('SESSION_TIMEOUT', (int) env('SESSION_TIMEOUT', 3600)); // detik
 if (session_status() === PHP_SESSION_NONE) {
     // Konfigurasi session aman sebelum session_start()
     ini_set('session.cookie_httponly',  '1');      // Cegah akses cookie via JS
-    ini_set('session.cookie_samesite',  'Strict'); // Cegah CSRF via cross-site request
+    ini_set('session.cookie_samesite',  'Lax');   // Lax: izinkan navigasi GET lintas-halaman (redirect login→dashboard)
     ini_set('session.use_strict_mode',  '1');      // Tolak session ID yang tidak diinisialisasi
     ini_set('session.cookie_secure',    '0');      // Set ke 1 jika sudah menggunakan HTTPS
     ini_set('session.gc_maxlifetime',   (string) SESSION_TIMEOUT);
     session_start();
 }
-
-// Load .env dari root aplikasi
-loadEnv(__DIR__ . '/../.env');
-
-
 
 // Database config (fallback langsung ke DB jika REST API audit belum tersedia)
 define('DB_HOST', env('DB_HOST', ''));

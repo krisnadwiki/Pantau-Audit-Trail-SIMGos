@@ -264,7 +264,22 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function showPanelError(containerId, msg) {
+        const c = document.getElementById(containerId);
+        if (c) {
+            c.innerHTML = `<div class="text-center py-3" style="color:var(--color-danger);font-size:.82rem;">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>${msg}
+            </div>`;
+        }
+    }
+
     async function loadDashboard() {
+        // Reset panels to loading state
+        ['panel-top-modul','panel-top-user'].forEach(id => {
+            const c = document.getElementById(id);
+            if (c) c.innerHTML = '<div class="text-center py-3"><span class="spin-sm"></span></div>';
+        });
+
         try {
             const data = await API.get('dashboard');
             const d = data.data || {};
@@ -283,6 +298,18 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } catch (err) {
             console.error('Dashboard load error:', err);
+            // Jika sesi habis/401 — redirect ke login
+            if (err.message && (err.message.includes('401') || err.message.toLowerCase().includes('unauthorized'))) {
+                window.location.href = '/login.php';
+                return;
+            }
+            // Tampilkan error state agar UI tidak terlihat loading selamanya
+            ['kpi-total','kpi-user','kpi-create','kpi-update'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = '—';
+            });
+            showPanelError('panel-top-modul', 'Gagal memuat data');
+            showPanelError('panel-top-user',  'Gagal memuat data');
         }
     }
 
