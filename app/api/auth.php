@@ -62,37 +62,83 @@ if ($action === 'captcha') {
 } elseif ($action === 'login') {
     require_method('POST');
 
+    // ── Rate Limiting: cek apakah IP/session sedang dalam lockout ──
+    $rateStatus = check_rate_limit(false);
+    if ($rateStatus['blocked']) {
+        $minutes = (int) ceil($rateStatus['retry_after'] / 60);
+        json_response([
+            'success' => false,
+            'message' => "Terlalu banyak percobaan login gagal. Silakan coba lagi dalam {$minutes} menit.",
+            'rate_limited' => true,
+            'retry_after'  => $rateStatus['retry_after'],
+        ], 429);
+    }
+
+    // ── CSRF Validation ──
+    $csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    if (empty($csrfToken) || !verify_csrf_token($csrfToken)) {
+        json_response([
+            'success' => false,
+            'message' => 'Request tidak valid. Silakan muat ulang halaman.'
+        ], 403);
+    }
+
     // Read JSON payload
     $inputJSON = file_get_contents('php://input');
     $input = json_decode($inputJSON, true);
-    
-    if (empty($input['LOGIN']) || empty($input['PASSWORD']) || empty($input['CAPTCHA'])) {
+
+    // ── Sanitasi & Validasi Input ──
+    $loginRaw    = trim($input['LOGIN']    ?? '');
+    $passwordRaw = $input['PASSWORD']      ?? '';
+    $captchaRaw  = trim($input['CAPTCHA'] ?? '');
+
+    // Batas panjang karakter
+    if (strlen($loginRaw) > 100 || strlen($passwordRaw) > 200 || strlen($captchaRaw) > 20) {
+        json_response([
+            'success' => false,
+            'message' => 'Input melebihi batas yang diizinkan.'
+        ], 400);
+    }
+
+    // Harus diisi
+    if (empty($loginRaw) || empty($passwordRaw) || empty($captchaRaw)) {
         json_response([
             'success' => false,
             'message' => 'Username, password, dan captcha harus diisi'
         ], 400);
     }
-    
+
+    // Validasi karakter username (hanya alfanumerik, titik, underscore, strip)
+    if (!preg_match('/^[\w.\-@]+$/', $loginRaw)) {
+        json_response([
+            'success' => false,
+            'message' => 'Format username tidak valid.'
+        ], 400);
+    }
+
+    // Validasi karakter captcha (hanya alfanumerik)
+    if (!preg_match('/^[a-zA-Z0-9]+$/', $captchaRaw)) {
+        json_response([
+            'success' => false,
+            'message' => 'Format captcha tidak valid.'
+        ], 400);
+    }
+
     // Call SIMGos backend login API
     $result = curl_request(API_BASE_URL . '/authentication/login', 'POST', [
-        'LOGIN'    => trim($input['LOGIN']),
-        'PASSWORD' => $input['PASSWORD'],
-        'CAPTCHA'  => trim($input['CAPTCHA'])
+        'LOGIN'    => $loginRaw,
+        'PASSWORD' => $passwordRaw,
+        'CAPTCHA'  => $captchaRaw
     ]);
     
     if ($result['status'] === 200 && !empty($result['body']['success'])) {
         $userData = $result['body']['data'] ?? [];
 
-        // ── Validasi hak akses modul 28 (PANTAU) ─────────────────────────
-        // Strategi: cari string literal "28":"28" atau "2801":"2801" dst.
-        // langsung di raw response menggunakan strpos — tidak bergantung pada
-        // json_decode yang terpotong saat response sangat besar.
-        // Pattern yang dicari: "28": "28" atau "2801": "2801" (dengan/tanpa spasi)
+        // ── Validasi hak akses modul 28 (PANTAU) ───────────────────────────────────────────────
         $rawResponse = $result['raw'] ?? json_encode($result['body']);
         $hasAccess   = false;
 
-        // Cek beberapa variasi format JSON yang mungkin
-        $patterns = ['"28":"28"', '"28" : "28"','"2801":"2801"','"2801" : "2801"']; // cek id m=modul
+        $patterns = ['"28":"28"', '"28" : "28"','"2801":"2801"','"2801" : "2801"'];
         foreach ($patterns as $pattern) {
             if (strpos($rawResponse, $pattern) !== false) {
                 $hasAccess = true;
@@ -101,23 +147,28 @@ if ($action === 'captcha') {
         }
 
         if (!$hasAccess) {
-            // Clear cookie SIMGOS agar captcha berikutnya memulai session baru di SIMGOS.
-            // Tanpa ini, user yang baru saja diberi akses masih akan ditolak
-            // karena cookie lama masih membawa XPRIV versi sebelumnya.
             unset($_SESSION['simgos_cookie']);
-
+            // Catat percobaan gagal (akses ditolak juga dihitung)
+            check_rate_limit(false);
             json_response([
                 'success' => false,
                 'message' => 'Akun Anda tidak memiliki akses ke aplikasi PANTAU. Hubungi administrator.'
             ], 403);
         }
-        // ─────────────────────────────────────────────────────────────────
+        // ────────────────────────────────────────────────────────────────────────
+
+        // Login sukses — reset rate limit counter
+        check_rate_limit(true);
+
+        // Regenerate session ID setelah login sukses (cegah session fixation)
+        session_regenerate_id(true);
+        $_SESSION['_last_regenerate'] = time();
 
         // Save authenticated user profile in session
         $_SESSION['user_data'] = [
             'id'       => $userData['ID']   ?? $userData['id']   ?? 1,
-            'username' => trim($input['LOGIN']),
-            'NAME'     => $userData['NAME'] ?? $userData['name'] ?? trim($input['LOGIN']),
+            'username' => $loginRaw,
+            'NAME'     => $userData['NAME'] ?? $userData['name'] ?? $loginRaw,
             'NIP'      => $userData['NIP']  ?? $userData['nip']  ?? '',
             'email'    => $userData['EMAIL'] ?? $userData['email'] ?? '',
             'role'     => $userData['ROLE'] ?? $userData['role']  ?? 'user',
@@ -129,6 +180,8 @@ if ($action === 'captcha') {
             'user'    => $_SESSION['user_data']
         ]);
     } else {
+        // Login gagal — catat percobaan untuk rate limiting
+        check_rate_limit(false);
         $message = $result['body']['message'] ?? 'Username, password, atau captcha salah';
         json_response([
             'success' => false,

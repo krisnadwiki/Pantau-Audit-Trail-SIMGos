@@ -10,6 +10,9 @@ if (isset($_SESSION['user_data'])) {
     header('Location: /dashboard.php');
     exit;
 }
+
+// Generate CSRF token untuk form login
+$csrfToken = generate_csrf_token();
 ?>
 <!DOCTYPE html>
 <html lang="id" data-theme="light">
@@ -17,6 +20,7 @@ if (isset($_SESSION['user_data'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Login PANTAU — Monitoring Audit Trail SIMGOS">
+    <meta name="csrf-token" content="<?= htmlspecialchars($csrfToken) ?>">
     <title>Login <?= htmlspecialchars(APP_NAME) ?></title>
     <link rel="icon" type="image/x-icon" href="/assets/image/favicon.ico">
 
@@ -508,7 +512,9 @@ if (isset($_SESSION['user_data'])) {
                     <div class="mb-3">
                         <label for="username" class="lp-label">Username</label>
                         <input type="text" class="lp-input" id="username"
-                               autocomplete="username" placeholder="Masukkan username" required autofocus>
+                               autocomplete="username" placeholder="Masukkan username"
+                               required autofocus maxlength="100"
+                               pattern="[\w.\-@]+" title="Hanya huruf, angka, titik, underscore, dan @">
                     </div>
 
                     <!-- Password -->
@@ -516,7 +522,8 @@ if (isset($_SESSION['user_data'])) {
                         <label for="password" class="lp-label">Password</label>
                         <div class="lp-input-group">
                             <input type="password" class="lp-input" id="password"
-                                   autocomplete="current-password" placeholder="Masukkan password" required>
+                                   autocomplete="current-password" placeholder="Masukkan password"
+                                   required maxlength="200">
                             <button type="button" class="lp-input-toggle" id="togglePassword" aria-label="Tampilkan password">
                                 <i class="bi bi-eye-slash"></i>
                             </button>
@@ -528,7 +535,9 @@ if (isset($_SESSION['user_data'])) {
                         <label for="captcha" class="lp-label">Kode Captcha</label>
                         <div class="captcha-row">
                             <input type="text" class="lp-input" id="captcha"
-                                   placeholder="Ketik kode captcha" required>
+                                   placeholder="Ketik kode captcha" required
+                                   autocomplete="off" maxlength="20"
+                                   pattern="[a-zA-Z0-9]+" title="Hanya huruf dan angka">
                             <div class="captcha-img-wrap">
                                 <img id="captchaImage" src="" alt="Captcha" style="display:none;">
                                 <div id="captchaLoading">
@@ -618,8 +627,29 @@ if (isset($_SESSION['user_data'])) {
             const password = document.getElementById('password').value;
             const captcha  = document.getElementById('captcha').value.trim();
 
+            // Validasi client-side
             if (!username || !password || !captcha) {
                 showError('Semua field harus diisi');
+                return;
+            }
+            if (username.length > 100) {
+                showError('Username terlalu panjang (maks 100 karakter)');
+                return;
+            }
+            if (password.length > 200) {
+                showError('Password terlalu panjang (maks 200 karakter)');
+                return;
+            }
+            if (captcha.length > 20) {
+                showError('Captcha terlalu panjang');
+                return;
+            }
+            if (!/^[\w.\-@]+$/.test(username)) {
+                showError('Format username mengandung karakter tidak valid');
+                return;
+            }
+            if (!/^[a-zA-Z0-9]+$/.test(captcha)) {
+                showError('Format captcha tidak valid (hanya huruf dan angka)');
                 return;
             }
 
@@ -628,10 +658,17 @@ if (isset($_SESSION['user_data'])) {
             loginSpinner.classList.remove('d-none');
             loginBtnText.innerHTML = 'Memproses...';
 
+            // Ambil CSRF token dari meta tag
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
             try {
                 const response = await fetch('/api/auth.php?action=login', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept':       'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
                     body: JSON.stringify({ LOGIN: username, PASSWORD: password, CAPTCHA: captcha })
                 });
 
@@ -641,6 +678,12 @@ if (isset($_SESSION['user_data'])) {
                     loginBtnText.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>Login Berhasil!';
                     loginBtn.style.background = 'linear-gradient(135deg,#16a34a,#15803d)';
                     setTimeout(() => { window.location.href = '/dashboard.php'; }, 700);
+                } else if (response.status === 429 && result.rate_limited) {
+                    // Rate limit — tampilkan countdown
+                    const retryAfter = result.retry_after || 900;
+                    showError(result.message || 'Terlalu banyak percobaan login.');
+                    loginBtn.disabled = true;
+                    startLockoutCountdown(retryAfter, loginBtn, loginBtnText, loginSpinner);
                 } else {
                     showError(result.message || 'Username, password, atau captcha salah');
                     loadCaptcha();
@@ -658,6 +701,24 @@ if (isset($_SESSION['user_data'])) {
                 loginBtnText.innerHTML = '<i class="bi bi-shield-lock me-1"></i>Masuk ke PANTAU';
             }
         });
+
+        function startLockoutCountdown(seconds, btn, btnText, spinner) {
+            spinner.classList.add('d-none');
+            let remaining = seconds;
+            function tick() {
+                const m = Math.floor(remaining / 60);
+                const s = remaining % 60;
+                btnText.innerHTML = `<i class="bi bi-lock-fill me-1"></i>Coba lagi dalam ${m}:${String(s).padStart(2,'0')}`;
+                if (remaining <= 0) {
+                    btn.disabled = false;
+                    btnText.innerHTML = '<i class="bi bi-shield-lock me-1"></i>Masuk ke PANTAU';
+                    return;
+                }
+                remaining--;
+                setTimeout(tick, 1000);
+            }
+            tick();
+        }
 
         function showError(msg) { errorMessage.textContent = msg; errorAlert.style.display = 'block'; }
         function hideError()    { errorAlert.style.display = 'none'; }

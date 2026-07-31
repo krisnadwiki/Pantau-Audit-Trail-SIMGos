@@ -26,7 +26,62 @@ if (!isset($_SESSION['user_data'])) {
     json_response(['success' => false, 'message' => 'Unauthorized'], 401);
 }
 
-$action = $_GET['action'] ?? '';
+// ===========================================================================
+// Input Sanitization Helper
+// ===========================================================================
+
+/**
+ * Sanitasi string dari parameter GET/POST.
+ * Strip tag HTML, batasi panjang, dan hapus karakter kontrol.
+ */
+function sanitize_string(string $value, int $maxLen = 200): string
+{
+    // Hapus tag HTML dan null bytes
+    $value = strip_tags($value);
+    $value = str_replace("\0", '', $value);
+    // Trim whitespace
+    $value = trim($value);
+    // Batasi panjang
+    if (mb_strlen($value) > $maxLen) {
+        $value = mb_substr($value, 0, $maxLen);
+    }
+    return $value;
+}
+
+/**
+ * Sanitasi integer dari parameter GET/POST.
+ * Kembalikan default jika tidak valid atau di luar rentang.
+ */
+function sanitize_int(mixed $value, int $min = 0, int $max = PHP_INT_MAX, int $default = 0): int
+{
+    $int = filter_var($value, FILTER_VALIDATE_INT);
+    if ($int === false) return $default;
+    return max($min, min($max, $int));
+}
+
+/**
+ * Sanitasi format tanggal YYYY-MM-DD.
+ * Kembalikan string kosong jika format tidak valid.
+ */
+function sanitize_date(string $value): string
+{
+    $value = trim($value);
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+        $d = DateTime::createFromFormat('Y-m-d', $value);
+        if ($d && $d->format('Y-m-d') === $value) {
+            return $value;
+        }
+    }
+    return '';
+}
+
+// Sanitasi action parameter
+$action = sanitize_string($_GET['action'] ?? '', 50);
+// Hanya izinkan karakter alfanumerik dan underscore untuk action
+if (!preg_match('/^[a-z_]+$/i', $action)) {
+    $action = '';
+}
+
 
 // ===========================================================================
 // Helper: Coba REST API dulu, fallback ke DB
@@ -1100,16 +1155,20 @@ if ($action === 'dashboard') {
 } elseif ($action === 'log') {
 
     $filters = [
-        'dari'     => $_GET['dari']     ?? date('Y-m-d'),
-        'sampai'   => $_GET['sampai']   ?? date('Y-m-d'),
-        'modul'    => $_GET['modul']    ?? '',
-        'aksi'     => $_GET['aksi']     ?? '',
-        'user'     => $_GET['user']     ?? '',
-        'norm'     => $_GET['norm']     ?? '',
-        'keyword'  => $_GET['keyword']  ?? '',
-        'page'     => $_GET['page']     ?? 1,
-        'per_page' => $_GET['per_page'] ?? 50,
+        'dari'     => sanitize_date($_GET['dari']     ?? date('Y-m-d')),
+        'sampai'   => sanitize_date($_GET['sampai']   ?? date('Y-m-d')),
+        'modul'    => sanitize_string($_GET['modul']  ?? '', 100),
+        'aksi'     => sanitize_string($_GET['aksi']   ?? '', 1),
+        'user'     => sanitize_string($_GET['user']   ?? '', 100),
+        'norm'     => sanitize_string($_GET['norm']   ?? '', 20),
+        'keyword'  => sanitize_string($_GET['keyword']?? '', 100),
+        'page'     => sanitize_int($_GET['page']     ?? 1, 1, 9999, 1),
+        'per_page' => sanitize_int($_GET['per_page'] ?? 50, 10, 200, 50),
     ];
+    // Pastikan field aksi hanya nilai yang valid
+    if (!in_array($filters['aksi'], ['', 'C', 'U', 'D'], true)) {
+        $filters['aksi'] = '';
+    }
 
     // 1. REST API
     $data = try_api('/audit/log', $filters);
@@ -1128,7 +1187,11 @@ if ($action === 'dashboard') {
 
 } elseif ($action === 'detail') {
 
-    $id = $_GET['id'] ?? '';
+    $id = sanitize_string($_GET['id'] ?? '', 30);
+    // ID hanya boleh berisi angka dan strip
+    if ($id !== '' && !preg_match('/^[\d\-]+$/', $id)) {
+        json_response(['success' => false, 'message' => 'ID tidak valid'], 400);
+    }
     if (!$id) {
         json_response(['success' => false, 'message' => 'ID diperlukan'], 400);
     }
@@ -1158,8 +1221,8 @@ if ($action === 'dashboard') {
 
 } elseif ($action === 'riwayat') {
 
-    $objekId = $_GET['objek'] ?? '';
-    $refId   = $_GET['ref']   ?? '';
+    $objekId = sanitize_string($_GET['objek'] ?? '', 30);
+    $refId   = sanitize_string($_GET['ref']   ?? '', 50);
 
     $data = try_api('/audit/riwayat', ['objek' => $objekId, 'ref' => $refId]);
     if ($data) {
@@ -1205,11 +1268,15 @@ if ($action === 'dashboard') {
 } elseif ($action === 'users') {
 
     $filters = [
-        'q'      => $_GET['q']      ?? '',
-        'dari'   => $_GET['dari']   ?? date('Y-m-d'),
-        'sampai' => $_GET['sampai'] ?? date('Y-m-d'),
-        'sort'   => $_GET['sort']   ?? 'total_desc',
+        'q'      => sanitize_string($_GET['q']      ?? '', 100),
+        'dari'   => sanitize_date($_GET['dari']     ?? date('Y-m-d')),
+        'sampai' => sanitize_date($_GET['sampai']   ?? date('Y-m-d')),
+        'sort'   => sanitize_string($_GET['sort']   ?? 'total_desc', 20),
     ];
+    // Validasi nilai sort yang diizinkan
+    if (!in_array($filters['sort'], ['total_desc', 'total_asc', 'nama_asc', 'latest'], true)) {
+        $filters['sort'] = 'total_desc';
+    }
 
     $data = try_api('/audit/users', $filters);
     if ($data) {
@@ -1239,8 +1306,8 @@ if ($action === 'dashboard') {
 
 } elseif ($action === 'statistic') {
 
-    $dari   = $_GET['dari']   ?? date('Y-m-d');
-    $sampai = $_GET['sampai'] ?? date('Y-m-d');
+    $dari   = sanitize_date($_GET['dari']   ?? date('Y-m-d'));
+    $sampai = sanitize_date($_GET['sampai'] ?? date('Y-m-d'));
 
     $data = try_api('/audit/statistic', ['dari' => $dari, 'sampai' => $sampai]);
     if ($data) {
@@ -1251,18 +1318,21 @@ if ($action === 'dashboard') {
 
 } elseif ($action === 'export') {
 
-    $format  = $_GET['format']  ?? 'csv';
+    $format  = in_array($_GET['format'] ?? '', ['csv', 'excel']) ? $_GET['format'] : 'csv';
     $filters = [
-        'dari'     => $_GET['dari']     ?? date('Y-m-d'),
-        'sampai'   => $_GET['sampai']   ?? date('Y-m-d'),
-        'modul'    => $_GET['modul']    ?? '',
-        'aksi'     => $_GET['aksi']     ?? '',
-        'user'     => $_GET['user']     ?? '',
-        'norm'     => $_GET['norm']     ?? '',
-        'keyword'  => $_GET['keyword']  ?? '',
+        'dari'     => sanitize_date($_GET['dari']     ?? date('Y-m-d')),
+        'sampai'   => sanitize_date($_GET['sampai']   ?? date('Y-m-d')),
+        'modul'    => sanitize_string($_GET['modul']  ?? '', 100),
+        'aksi'     => sanitize_string($_GET['aksi']   ?? '', 1),
+        'user'     => sanitize_string($_GET['user']   ?? '', 100),
+        'norm'     => sanitize_string($_GET['norm']   ?? '', 20),
+        'keyword'  => sanitize_string($_GET['keyword']?? '', 100),
         'page'     => 1,
         'per_page' => 5000,
     ];
+    if (!in_array($filters['aksi'], ['', 'C', 'U', 'D'], true)) {
+        $filters['aksi'] = '';
+    }
 
     // Coba REST API export
     $data = try_api('/audit/export', $_GET);
@@ -1319,8 +1389,8 @@ if ($action === 'dashboard') {
 
 } elseif ($action === 'login_stat') {
 
-    $dari   = $_GET['dari']   ?? date('Y-m-d');
-    $sampai = $_GET['sampai'] ?? date('Y-m-d');
+    $dari   = sanitize_date($_GET['dari']   ?? date('Y-m-d'));
+    $sampai = sanitize_date($_GET['sampai'] ?? date('Y-m-d'));
 
     $data = db_login_stat($dari, $sampai);
     if ($data) {
@@ -1331,12 +1401,12 @@ if ($action === 'dashboard') {
 } elseif ($action === 'login_log') {
 
     $filters = [
-        'dari'     => $_GET['dari']     ?? date('Y-m-d'),
-        'sampai'   => $_GET['sampai']   ?? date('Y-m-d'),
-        'user'     => $_GET['user']     ?? '',
-        'ip'       => $_GET['ip']       ?? '',
-        'page'     => $_GET['page']     ?? 1,
-        'per_page' => $_GET['per_page'] ?? 50,
+        'dari'     => sanitize_date($_GET['dari']     ?? date('Y-m-d')),
+        'sampai'   => sanitize_date($_GET['sampai']   ?? date('Y-m-d')),
+        'user'     => sanitize_string($_GET['user']   ?? '', 100),
+        'ip'       => sanitize_string($_GET['ip']     ?? '', 45),
+        'page'     => sanitize_int($_GET['page']     ?? 1, 1, 9999, 1),
+        'per_page' => sanitize_int($_GET['per_page'] ?? 50, 10, 200, 50),
     ];
 
     $data = db_login_log($filters);
@@ -1347,8 +1417,8 @@ if ($action === 'dashboard') {
 
 } elseif ($action === 'analytic_range') {
 
-    $dari   = $_GET['dari']   ?? date('Y-m-d', strtotime('-30 days'));
-    $sampai = $_GET['sampai'] ?? date('Y-m-d');
+    $dari   = sanitize_date($_GET['dari']   ?? date('Y-m-d', strtotime('-30 days')));
+    $sampai = sanitize_date($_GET['sampai'] ?? date('Y-m-d'));
 
     $data = db_analytic_range($dari, $sampai);
     if ($data) {

@@ -966,12 +966,23 @@ a:hover { color: var(--color-primary-h); }
 }
 
 /* --------------------------------------------------------------------------
-   Responsive
+   Responsive — Mobile
    -------------------------------------------------------------------------- */
-@media (max-width: 768px) {
+
+/* ≤ 991px: sembunyikan desktop sidebar, perlihatkan app-main tanpa margin */
+@media (max-width: 991.98px) {
     :root { --sidebar-w: 0px; }
-    .app-sidebar { display: none; }
-    .app-footer { margin-left: 0; }
+    .app-sidebar { display: none !important; }
+    .app-main   { margin-left: 0 !important; }
+    .app-footer { margin-left: 0 !important; }
+}
+
+/* ≤ 576px: compact spacing konten */
+@media (max-width: 576px) {
+    .app-content { padding: 1rem .75rem; }
+    .stat-card   { padding: 1rem 1.1rem; }
+    .filter-bar  { padding: .75rem; }
+    .page-title  { font-size: 1.15rem; }
 }
 
 /* --------------------------------------------------------------------------
@@ -1000,9 +1011,7 @@ a:hover { color: var(--color-primary-h); }
    Smooth Theme Transition
    -------------------------------------------------------------------------- */
 body.app-body,
-body.app-body *,
-body.app-body *::before,
-body.app-body *::after {
+body.app-body *:not(.offcanvas):not(.offcanvas-backdrop):not(.modal):not(.modal-backdrop) {
     transition-property: background-color, border-color, color, box-shadow;
     transition-duration: .2s;
     transition-timing-function: ease;
@@ -1257,52 +1266,100 @@ dialog.audit-dialog::backdrop {
 }
 
 .dialog-head {
-    background:  var(--color-primary);
-    color:       #fff;
-    padding:     .85rem 1.25rem;
-    display:     flex;
+    background:     var(--grad-primary);
+    color:          #ffffff;
+    padding:        1rem 1.25rem;
+    display:        flex;
     justify-content: space-between;
-    align-items: center;
-    gap:         1rem;
+    align-items:    center;
+    gap:            1rem;
+    border-bottom:  1px solid rgba(255, 255, 255, 0.15);
+    box-shadow:     0 2px 10px rgba(0,0,0,0.15);
 }
 
-.dialog-head h3 { font-size: .95rem; font-weight: 700; margin: 0; }
-.dialog-head p  { font-size: .78rem; opacity: .85; margin: .15rem 0 0; font-family: ui-monospace, Consolas, monospace; }
+.dialog-head h3 {
+    font-size:      1rem;
+    font-weight:    700;
+    color:          #ffffff !important;
+    margin:         0;
+    letter-spacing: -.01em;
+    display:        flex;
+    align-items:    center;
+    gap:            .4rem;
+}
+
+.dialog-head p,
+#d-sub {
+    font-size:      .78rem;
+    color:          rgba(255, 255, 255, 0.95) !important;
+    margin:         .2rem 0 0;
+    font-family:    ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-weight:    500;
+    letter-spacing: .01em;
+    word-break:     break-all;
+    text-shadow:    0 1px 2px rgba(0,0,0,0.15);
+}
 
 .dialog-close {
-    background: rgba(255,255,255,.2);
-    border:     none;
-    color:      #fff;
-    width:      28px; height: 28px;
-    border-radius: var(--radius-sm);
-    cursor:     pointer;
-    font-size:  1rem;
-    line-height: 1;
-    flex-shrink: 0;
-    transition: background .15s;
+    background:     rgba(255, 255, 255, 0.2);
+    border:         1px solid rgba(255, 255, 255, 0.3);
+    color:          #ffffff;
+    width:          30px;
+    height:         30px;
+    border-radius:  50%;
+    cursor:         pointer;
+    font-size:      1.1rem;
+    line-height:    1;
+    display:        inline-flex;
+    align-items:    center;
+    justify-content: center;
+    flex-shrink:    0;
+    transition:     all .15s ease;
 }
-.dialog-close:hover { background: rgba(255,255,255,.35); }
+.dialog-close:hover {
+    background:     rgba(239, 68, 68, 0.9);
+    border-color:   rgba(239, 68, 68, 0.9);
+    color:          #ffffff;
+    transform:      scale(1.05);
+}
 
 .dialog-tools {
-    display:     flex;
-    gap:         .5rem;
-    align-items: center;
+    display:        flex;
+    gap:            .5rem;
+    align-items:    center;
 }
 
 .dialog-tool-btn {
-    background: rgba(255,255,255,.2);
-    border:     none;
-    color:      #fff;
-    padding:    .3rem .75rem;
-    border-radius: var(--radius-sm);
-    cursor:     pointer;
-    font-size:  .78rem;
-    font-weight: 600;
-    font-family: var(--app-font);
-    white-space: nowrap;
-    transition: background .15s;
+    background:     rgba(255, 255, 255, 0.2);
+    border:         1px solid rgba(255, 255, 255, 0.3);
+    color:          #ffffff;
+    padding:        .35rem .75rem;
+    border-radius:  var(--radius-sm);
+    cursor:         pointer;
+    font-size:      .78rem;
+    font-weight:    600;
+    font-family:    var(--app-font);
+    white-space:    nowrap;
+    transition:     all .15s ease;
+    display:        inline-flex;
+    align-items:    center;
+    gap:            .35rem;
 }
-.dialog-tool-btn:hover { background: rgba(255,255,255,.35); }
+.dialog-tool-btn:hover {
+    background:     rgba(255, 255, 255, 0.35);
+    color:          #ffffff;
+}
+
+.diff-table-wrapper {
+    width:          100%;
+    overflow-x:     auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.diff-mobile-label,
+.diff-mobile-label-field {
+    display:        none;
+}
 
 .dialog-body {
     max-height: 70vh;
@@ -1641,12 +1698,17 @@ dialog.audit-dialog::backdrop {
 }
 
 .brand-sub {
-    font-size:      .6rem;
-    font-weight:    600;
+    font-size:      .62rem;
+    font-weight:    700;
     color:          var(--color-primary);
     letter-spacing: .07em;
     text-transform: uppercase;
     white-space:    nowrap;
+}
+
+[data-theme="light"] .brand-sub {
+    color: #0d6460;
+    font-weight: 700;
 }
 
 /* --------------------------------------------------------------------------
@@ -1831,3 +1893,201 @@ dialog.audit-dialog::backdrop {
 [data-theme="light"] .aksi-C { background: rgba(22,163,74,.12);   color: #15803d; }
 [data-theme="light"] .aksi-U { background: rgba(217,119,6,.12);   color: #b45309; }
 [data-theme="light"] .aksi-D { background: rgba(220,38,38,.12);   color: #b91c1c; }
+
+/* --------------------------------------------------------------------------
+   Mobile Navbar & Offcanvas Sidebar Smooth Styling
+   -------------------------------------------------------------------------- */
+.btn-sidebar-toggle {
+    display:         inline-flex;
+    align-items:     center;
+    justify-content: center;
+    width:           36px;
+    height:          36px;
+    border-radius:   var(--radius-sm);
+    border:          1px solid var(--color-border);
+    background:      var(--color-surface-2);
+    color:           var(--color-text);
+    font-size:       1.25rem;
+    cursor:          pointer;
+    transition:      background .2s, transform .15s;
+    line-height:     1;
+    padding:         0;
+}
+
+.btn-sidebar-toggle:hover {
+    background:      var(--color-border);
+    color:           var(--color-primary);
+}
+
+.btn-sidebar-toggle:active {
+    transform:       scale(.94);
+}
+
+/* Offcanvas Drawer Smooth Transitions */
+.app-offcanvas-sidebar {
+    width:            270px !important;
+    background-color: var(--color-surface) !important;
+    color:            var(--color-text) !important;
+    border-right:     1px solid var(--color-border) !important;
+    box-shadow:       var(--shadow-lg);
+    transition:       transform .35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.offcanvas-backdrop.show {
+    opacity:          .5 !important;
+    backdrop-filter:  blur(4px);
+    transition:       opacity .35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.btn-offcanvas-close {
+    display:         inline-flex;
+    align-items:     center;
+    justify-content: center;
+    width:           30px;
+    height:          30px;
+    border-radius:   var(--radius-sm);
+    border:          1px solid var(--color-border);
+    background:      var(--color-surface-2);
+    color:           var(--color-text-muted);
+    font-size:       1rem;
+    cursor:          pointer;
+    transition:      all .15s;
+}
+
+.btn-offcanvas-close:hover {
+    background:      var(--color-danger);
+    border-color:    var(--color-danger);
+    color:           #fff;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive Mobile Redesign for Modal Rincian
+   -------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+    dialog.audit-dialog {
+        width: 95vw !important;
+        max-width: 95vw !important;
+        max-height: 90vh !important;
+        margin: auto;
+        border-radius: var(--radius-md) !important;
+    }
+
+    .dialog-head {
+        padding: .75rem 1rem;
+    }
+
+    .dialog-head h3 {
+        font-size: .9rem;
+    }
+
+    .dialog-head p,
+    #d-sub {
+        font-size: .72rem;
+    }
+
+    .dialog-tools {
+        gap: .35rem;
+    }
+
+    .dialog-tool-btn {
+        font-size: .7rem;
+        padding: .25rem .5rem;
+    }
+
+    .dialog-konteks {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: .5rem !important;
+        padding: .65rem .85rem !important;
+    }
+
+    .konteks-item {
+        background: var(--color-surface-2);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        padding: .4rem .55rem;
+    }
+
+    .dialog-riwayat {
+        padding: .65rem .85rem !important;
+    }
+
+    .riwayat-item {
+        font-size: .78rem !important;
+        padding: .4rem .5rem !important;
+    }
+
+    /* Mobile Diff Cards Layout */
+    .diff-table {
+        display: block;
+        width: 100%;
+    }
+
+    .diff-table thead {
+        display: none;
+    }
+
+    .diff-table tbody {
+        display: flex;
+        flex-direction: column;
+        gap: .75rem;
+        padding: .75rem;
+    }
+
+    .diff-table tbody tr {
+        display: block;
+        background: var(--color-surface-2);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        padding: .75rem;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .diff-table tbody tr td {
+        display: block;
+        width: 100%;
+        padding: 0;
+        border: none;
+    }
+
+    .diff-field {
+        font-size: .85rem;
+        font-weight: 700;
+        color: var(--color-primary);
+        padding-bottom: .4rem !important;
+        margin-bottom: .5rem;
+        border-bottom: 1px solid var(--color-border) !important;
+        word-break: break-all;
+    }
+
+    .diff-mobile-label-field {
+        display: block;
+        font-size: .62rem;
+        font-weight: 700;
+        color: var(--color-text-subtle);
+        letter-spacing: .06em;
+        margin-bottom: .15rem;
+    }
+
+    .diff-value {
+        margin-bottom: .4rem;
+        padding: .5rem .65rem !important;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border-light);
+        border-radius: var(--radius-sm);
+        font-size: .8rem;
+    }
+
+    .diff-mobile-label {
+        display: block;
+        font-size: .63rem;
+        font-weight: 700;
+        color: var(--color-text-subtle);
+        letter-spacing: .05em;
+        margin-bottom: .2rem;
+    }
+
+    .diff-val-content {
+        word-break: break-word;
+    }
+}

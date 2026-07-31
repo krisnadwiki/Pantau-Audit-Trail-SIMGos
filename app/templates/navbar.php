@@ -1,5 +1,16 @@
 <nav class="navbar navbar-expand-lg navbar-dark app-navbar" id="main-navbar">
-    <div class="container-fluid px-4">
+    <div class="container-fluid px-3 px-md-4">
+
+        <!-- Mobile: hamburger untuk membuka sidebar (offcanvas) -->
+        <button class="btn-sidebar-toggle d-lg-none me-2"
+                type="button"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#mobileSidebar"
+                aria-controls="mobileSidebar"
+                aria-label="Buka menu navigasi">
+            <i class="bi bi-list"></i>
+        </button>
+
         <!-- Brand -->
         <a class="navbar-brand d-flex align-items-center gap-2" href="/dashboard.php">
             <span class="brand-logo-wrap">
@@ -10,16 +21,13 @@
             </span>
             <span class="brand-text">
                 <span class="brand-name">PANTAU</span>
-                <span class="brand-sub">Audit Trail SIMGOS</span>
+                <span class="brand-sub d-none d-sm-inline">Audit Trail SIMGOS</span>
             </span>
         </a>
 
-        <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ms-auto align-items-center gap-1">
+        <!-- Desktop: collapse nav items (theme toggle + user) -->
+        <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+            <ul class="navbar-nav align-items-center gap-1">
                 <!-- Theme Toggle Button -->
                 <li class="nav-item ms-1">
                     <button class="btn-theme-toggle" id="btn-theme-toggle"
@@ -72,6 +80,51 @@
                 <?php endif; ?>
             </ul>
         </div>
+
+        <!-- Mobile: theme toggle selalu terlihat (di luar collapse) -->
+        <div class="d-flex d-lg-none align-items-center gap-2 ms-auto">
+            <button class="btn-theme-toggle" id="btn-theme-toggle-mobile"
+                    title="Ganti tema" aria-label="Toggle tema">
+                <i class="bi bi-brightness-high-fill"></i>
+            </button>
+            <?php if (isset($_SESSION['user_data'])): ?>
+                <div class="dropdown">
+                    <button class="user-avatar-badge border-0 p-0"
+                            style="cursor:pointer;"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false"
+                            aria-label="Menu user">
+                        <i class="bi bi-person-fill"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end user-dropdown mt-2">
+                        <li>
+                            <div class="user-dropdown-header">
+                                <span class="user-avatar-badge-lg">
+                                    <i class="bi bi-person-fill"></i>
+                                </span>
+                                <div>
+                                    <div class="fw-semibold" style="font-size:.85rem; color:var(--color-text);">
+                                        <?= htmlspecialchars($_SESSION['user_data']['NAME']) ?>
+                                    </div>
+                                    <div style="font-size:.75rem; color:var(--color-text-muted);">
+                                        <i class="bi bi-person me-1"></i><?= htmlspecialchars($_SESSION['user_data']['username'] ?? '-') ?>
+                                    </div>
+                                    <span class="role-badge text-capitalize">
+                                        <i class="bi bi-shield me-1"></i><?= htmlspecialchars($_SESSION['user_data']['role'] ?? 'User') ?>
+                                    </span>
+                                </div>
+                            </div>
+                        </li>
+                        <li><hr class="dropdown-divider" style="border-color:var(--color-border); margin:.25rem 0;"></li>
+                        <li>
+                            <a class="dropdown-item logout-item d-flex align-items-center gap-2" href="#" id="logoutBtnMobile">
+                                <i class="bi bi-box-arrow-right"></i>Logout
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            <?php endif; ?>
+        </div>
     </div>
 </nav>
 
@@ -104,18 +157,20 @@
 <?php if (isset($_SESSION['user_data'])): ?>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const logoutBtn     = document.getElementById('logoutBtn');
     const confirmBtn    = document.getElementById('confirmLogoutBtn');
     const logoutSpinner = document.getElementById('logoutSpinner');
     const logoutIcon    = document.getElementById('logoutIcon');
     const logoutModal   = new bootstrap.Modal(document.getElementById('logoutModal'));
 
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            logoutModal.show();
-        });
-    }
+    // Handle semua tombol logout (desktop dan mobile)
+    document.querySelectorAll('#logoutBtn, #logoutBtnMobile').forEach(function(btn) {
+        if (btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                logoutModal.show();
+            });
+        }
+    });
 
     if (confirmBtn) {
         confirmBtn.addEventListener('click', async function() {
@@ -142,6 +197,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 logoutIcon.classList.remove('d-none');
             }
         });
+    }
+
+    // Sinkronisasi tombol theme mobile & desktop
+    const toggleMobile  = document.getElementById('btn-theme-toggle-mobile');
+    const toggleDesktop = document.getElementById('btn-theme-toggle');
+
+    if (toggleMobile && toggleDesktop) {
+        toggleMobile.addEventListener('click', function() {
+            toggleDesktop.click();
+        });
+        // Sinkronisasi ikon setelah toggle desktop dieksekusi
+        const observer = new MutationObserver(function() {
+            toggleMobile.querySelector('i').className = toggleDesktop.querySelector('i').className;
+        });
+        observer.observe(toggleDesktop, { subtree: true, childList: true, characterData: true, attributes: true });
     }
 });
 </script>

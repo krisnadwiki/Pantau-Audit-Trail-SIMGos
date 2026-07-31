@@ -21,25 +21,29 @@
 <dialog class="audit-dialog" id="rincian-dialog">
     <div class="dialog-head">
         <div>
-            <h3 id="d-judul">Rincian Perubahan</h3>
+            <h3 id="d-judul"><i class="bi bi-shield-check me-2"></i>Rincian Perubahan</h3>
             <p id="d-sub"></p>
         </div>
         <div class="dialog-tools">
-            <button class="dialog-tool-btn" id="d-alih">Lihat kode asli</button>
-            <button class="dialog-close" onclick="document.getElementById('rincian-dialog').close()">&times;</button>
+            <button class="dialog-tool-btn" id="d-alih">
+                <i class="bi bi-code-slash me-1"></i>Kode asli
+            </button>
+            <button class="dialog-close" onclick="document.getElementById('rincian-dialog').close()" aria-label="Tutup modal">&times;</button>
         </div>
     </div>
     <div class="dialog-body">
         <div class="dialog-konteks" id="d-konteks" style="display:none"></div>
         <div class="dialog-riwayat" id="d-riwayat"></div>
-        <table class="diff-table">
-            <thead><tr>
-                <th style="width:22%">Kolom</th>
-                <th style="width:39%">Sebelum</th>
-                <th style="width:39%">Sesudah</th>
-            </tr></thead>
-            <tbody id="d-tbody"></tbody>
-        </table>
+        <div class="diff-table-wrapper">
+            <table class="diff-table">
+                <thead><tr>
+                    <th style="width:22%">Kolom</th>
+                    <th style="width:39%">Sebelum</th>
+                    <th style="width:39%">Sesudah</th>
+                </tr></thead>
+                <tbody id="d-tbody"></tbody>
+            </table>
+        </div>
     </div>
 </dialog>
 
@@ -127,9 +131,9 @@
 
             const kelas = _modeMentah ? 'raw' : '';
             return `<tr>
-                <td class="diff-field">${esc(k)}</td>
-                <td class="diff-value ${kelas}">${laHtml}</td>
-                <td class="diff-value ${kelas}">${baHtml}</td>
+                <td class="diff-field"><span class="diff-mobile-label-field">KOLOM</span>${esc(k)}</td>
+                <td class="diff-value ${kelas}"><span class="diff-mobile-label"><i class="bi bi-arrow-left-circle me-1"></i>SEBELUM:</span><div class="diff-val-content">${laHtml}</div></td>
+                <td class="diff-value ${kelas}"><span class="diff-mobile-label"><i class="bi bi-arrow-right-circle me-1"></i>SESUDAH:</span><div class="diff-val-content">${baHtml}</div></td>
             </tr>`;
         }).join('');
     }
@@ -142,7 +146,7 @@
         let html = '';
         if (k) {
             if (k.norm)      html += `<div class="konteks-item"><small>No. Rekam Medis</small><b>${esc(k.norm)}</b></div>`;
-            if (k.pasien)    html += `<div class="konteks-item"><small>Nama Pasien</small><b style="font-family:inherit;font-size:.9rem">${esc(k.pasien)}</b></div>`;
+            if (k.pasien)    html += `<div class="konteks-item"><small>Nama Pasien</small><b style="font-family:inherit;font-size:.88rem">${esc(k.pasien)}</b></div>`;
             if (k.ruangan)   html += `<div class="konteks-item"><small>Ruangan</small><b style="font-family:inherit">${esc(k.ruangan)}</b></div>`;
             if (k.kunjungan) html += `<div class="konteks-item"><small>No. Kunjungan</small><b>${esc(k.kunjungan)}</b></div>`;
             if (k.nopen)     html += `<div class="konteks-item"><small>No. Pendaftaran</small><b>${esc(k.nopen)}</b></div>`;
@@ -219,9 +223,15 @@
         _modeMentah  = false;
         _currentRiwayatList = [];
 
-        document.getElementById('d-judul').textContent = config.judul || 'Rincian';
-        document.getElementById('d-sub').textContent   = config.sub   || '';
-        document.getElementById('d-alih').textContent  = 'Lihat kode asli';
+        const dJudul = document.getElementById('d-judul');
+        if (config.judul) {
+            dJudul.innerHTML = `<i class="bi bi-shield-check me-2"></i>${esc(config.judul)}`;
+        } else {
+            dJudul.innerHTML = `<i class="bi bi-shield-check me-2"></i>Rincian Perubahan`;
+        }
+
+        document.getElementById('d-sub').textContent  = config.sub  || '';
+        document.getElementById('d-alih').innerHTML = '<i class="bi bi-code-slash me-1"></i>Kode asli';
 
         renderDiff();
         muatRiwayat(config.objek, config.ref);
@@ -247,7 +257,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('d-alih').addEventListener('click', function() {
             _modeMentah = !_modeMentah;
-            this.textContent = _modeMentah ? 'Lihat teks terbaca' : 'Lihat kode asli';
+            this.innerHTML = _modeMentah ? '<i class="bi bi-text-left me-1"></i>Teks terbaca' : '<i class="bi bi-code-slash me-1"></i>Kode asli';
             renderDiff();
         });
 
