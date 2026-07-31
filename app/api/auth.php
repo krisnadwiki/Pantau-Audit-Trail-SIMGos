@@ -12,14 +12,16 @@ require_once __DIR__ . '/../config/config.php';
 $action = $_GET['action'] ?? '';
 
 if ($action === 'captcha') {
+    // Clear cookie SIMGOS lama sebelum minta captcha baru.
+    // Ini memastikan setiap sesi login dimulai fresh — penting agar SIMGOS
+    // mengembalikan XPRIV terbaru (misalnya setelah hak akses user diubah).
+    unset($_SESSION['simgos_cookie']);
+
     // Dedicated curl call for captcha to preserve raw binary output and exact Content-Type header
     $url = API_BASE_URL . '/authentication/captcha';
     $ch = curl_init();
-    
+
     $headers = [];
-    if (!empty($_SESSION['simgos_cookie'])) {
-        $headers[] = 'Cookie: ' . $_SESSION['simgos_cookie'];
-    }
     
     curl_setopt_array($ch, [
         CURLOPT_URL            => $url,
@@ -99,6 +101,11 @@ if ($action === 'captcha') {
         }
 
         if (!$hasAccess) {
+            // Clear cookie SIMGOS agar captcha berikutnya memulai session baru di SIMGOS.
+            // Tanpa ini, user yang baru saja diberi akses masih akan ditolak
+            // karena cookie lama masih membawa XPRIV versi sebelumnya.
+            unset($_SESSION['simgos_cookie']);
+
             json_response([
                 'success' => false,
                 'message' => 'Akun Anda tidak memiliki akses ke aplikasi PANTAU. Hubungi administrator.'
@@ -130,12 +137,15 @@ if ($action === 'captcha') {
     }
 
 } elseif ($action === 'logout') {
-    // Call SIMGos logout API to invalidate backend session if a cookie exists
+    // Invalidate session di SIMGOS backend
     if (!empty($_SESSION['simgos_cookie'])) {
         curl_request(API_BASE_URL . '/authentication/logout', 'POST');
     }
+
+    // Hapus cookie SIMGOS dari session
+    unset($_SESSION['simgos_cookie']);
     
-    // Clear and destroy PHP Session
+    // Clear dan destroy PHP Session
     $_SESSION = [];
     if (ini_get("session.use_cookies")) {
         $params = session_get_cookie_params();
