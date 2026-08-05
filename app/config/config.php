@@ -10,12 +10,14 @@ require_once __DIR__ . '/env.php';
 loadEnv(__DIR__ . '/../.env');
 
 // Konstanta aplikasi
-define('APP_NAME',        env('APP_NAME',    'PANTAU - Pusat Analitik Transaksi dan Aktivitas User'));
-define('APP_SHORT',       'PANTAU');
-define('APP_VERSION',     '1.0.0');
-define('API_BASE_URL',    rtrim(env('API_BASE_URL', 'http://192.168.12.15/webservice'), '/'));
-define('APP_TIMEZONE',    env('TIMEZONE',    'Asia/Jakarta'));
-define('SESSION_TIMEOUT', (int) env('SESSION_TIMEOUT', 3600)); // detik
+define('APP_NAME',             env('APP_NAME',    'PANTAU - Pusat Analitik Transaksi dan Aktivitas User'));
+define('APP_SHORT',            'PANTAU');
+define('APP_VERSION',          '1.0.0');
+define('API_BASE_URL',         rtrim(env('API_BASE_URL', 'http://192.168.12.15/webservice'), '/'));
+define('APP_CAPTCHA',          (bool) env('CAPTCHA', false));
+define('LOGIN_MAX_ATTEMPTS',   (int)  env('LOGIN_MAX_ATTEMPTS',   5));    // Maks percobaan gagal
+define('LOGIN_WINDOW_SECONDS', (int)  env('LOGIN_WINDOW_SECONDS', 600));  // Window 10 menit
+define('LOGIN_LOCKOUT_SECONDS',(int)  env('LOGIN_LOCKOUT_SECONDS', 900)); // Lockout 15 menit (detik)
 
 // ── Session Hardening ──────────────────────────────────────────────────────
 if (session_status() === PHP_SESSION_NONE) {
@@ -24,8 +26,48 @@ if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.cookie_samesite',  'Lax');   // Lax: izinkan navigasi GET lintas-halaman (redirect login→dashboard)
     ini_set('session.use_strict_mode',  '1');      // Tolak session ID yang tidak diinisialisasi
     ini_set('session.cookie_secure',    '0');      // Set ke 1 jika sudah menggunakan HTTPS
-    ini_set('session.gc_maxlifetime',   (string) SESSION_TIMEOUT);
+    
+    // Set maxlifetime sementara menggunakan nilai env
+    $tempTimeout = (int) env('SESSION_TIMEOUT', 3600);
+    ini_set('session.gc_maxlifetime',   (string) $tempTimeout);
     session_start();
+}
+
+// Definisikan konstanta secara dinamis setelah session_start()
+$dynamicTimeout = (int) ($_SESSION['settings']['session_timeout'] ?? env('SESSION_TIMEOUT', 3600));
+define('SESSION_TIMEOUT', $dynamicTimeout); // detik
+
+$dynamicTimezone = $_SESSION['settings']['timezone'] ?? env('TIMEZONE', 'Asia/Jakarta');
+define('APP_TIMEZONE', $dynamicTimezone);
+
+// Pengecekan session timeout 
+if (isset($_SESSION['user_data'])) {
+    if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY'] > SESSION_TIMEOUT)) {
+        // Hapus session SIMGOS backend jika ada cookie
+        if (!empty($_SESSION['simgos_cookie'])) {
+            curl_request(API_BASE_URL . '/authentication/logout', 'POST');
+        }
+        
+        // Hapus sesi lokal
+        $_SESSION = [];
+        if (ini_get("session.use_cookies")) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000,
+                $params["path"], $params["domain"],
+                $params["secure"], $params["httponly"]
+            );
+        }
+        session_destroy();
+
+        // Redirect ke login jika bukan request API
+        if (strpos($_SERVER['REQUEST_URI'], '/api/') === false) {
+            header('Location: /login.php?expired=1');
+            exit;
+        } else {
+            json_response(['success' => false, 'message' => 'Session expired'], 401);
+        }
+    }
+    $_SESSION['LAST_ACTIVITY'] = time();
 }
 
 // Database config (fallback langsung ke DB jika REST API audit belum tersedia)
@@ -100,9 +142,9 @@ function verify_csrf_token(string $token): bool
  */
 function check_rate_limit(bool $reset = false): array
 {
-    $maxAttempts   = 5;    // Maksimum percobaan gagal
-    $windowSeconds = 600;  // Window 10 menit
-    $lockoutSeconds = 900; // Lockout 15 menit
+    $maxAttempts    = LOGIN_MAX_ATTEMPTS;    // Dari env LOGIN_MAX_ATTEMPTS
+    $windowSeconds  = LOGIN_WINDOW_SECONDS;  // Dari env LOGIN_WINDOW_SECONDS
+    $lockoutSeconds = LOGIN_LOCKOUT_SECONDS; // Dari env LOGIN_LOCKOUT_SECONDS
 
     if ($reset) {
         unset($_SESSION['_login_attempts'], $_SESSION['_login_lockout_until']);

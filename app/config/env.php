@@ -31,11 +31,9 @@ function loadEnv(string $path): void
         // Hapus tanda kutip jika ada
         $value = trim($value, '"\'');
 
-        if (!array_key_exists($key, $_SERVER) && !array_key_exists($key, $_ENV)) {
-            putenv("{$key}={$value}");
-            $_ENV[$key]    = $value;
-            $_SERVER[$key] = $value;
-        }
+        putenv("{$key}={$value}");
+        $_ENV[$key]    = $value;
+        $_SERVER[$key] = $value;
     }
 }
 

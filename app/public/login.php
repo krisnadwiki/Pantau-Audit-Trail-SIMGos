@@ -13,6 +13,18 @@ if (isset($_SESSION['user_data'])) {
 
 // Generate CSRF token untuk form login
 $csrfToken = generate_csrf_token();
+
+// Cek status lockout dari rate limiter
+$lockoutTimeRemaining = 0;
+if (!empty($_SESSION['_login_lockout_until'])) {
+    $retryAfter = (int) $_SESSION['_login_lockout_until'] - time();
+    if ($retryAfter > 0) {
+        $lockoutTimeRemaining = $retryAfter;
+    } else {
+        // Lockout selesai, bersihkan session lockout
+        unset($_SESSION['_login_lockout_until'], $_SESSION['_login_attempts']);
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="id" data-theme="light">
@@ -374,6 +386,19 @@ $csrfToken = generate_csrf_token();
             margin-bottom: 1.25rem;
         }
 
+        .lp-warning {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            background: rgba(217,119,6,.07);
+            border: 1.5px solid rgba(217,119,6,.2);
+            border-radius: 8px;
+            padding: .65rem .9rem;
+            font-size: .82rem;
+            color: #d97706;
+            margin-bottom: 1.25rem;
+        }
+
         /* ── Submit Button ── */
         .btn-submit {
             width: 100%;
@@ -507,6 +532,14 @@ $csrfToken = generate_csrf_token();
                     </div>
                 </div>
 
+                <?php if (isset($_GET['expired']) && $_GET['expired'] == 1): ?>
+                <!-- Session Expired Alert -->
+                <div class="lp-warning" id="expiredAlert">
+                    <i class="bi bi-exclamation-circle-fill flex-shrink-0"></i>
+                    <span>Sesi Anda telah berakhir karena tidak ada aktivitas. Silakan masuk kembali.</span>
+                </div>
+                <?php endif; ?>
+
                 <form id="loginForm" novalidate>
                     <!-- Username -->
                     <div class="mb-3">
@@ -530,6 +563,7 @@ $csrfToken = generate_csrf_token();
                         </div>
                     </div>
 
+                    <?php if (defined('APP_CAPTCHA') && APP_CAPTCHA): ?>
                     <!-- Captcha -->
                     <div class="mb-4">
                         <label for="captcha" class="lp-label">Kode Captcha</label>
@@ -549,6 +583,7 @@ $csrfToken = generate_csrf_token();
                             </button>
                         </div>
                     </div>
+                    <?php endif; ?>
 
                     <!-- Submit -->
                     <button type="submit" class="btn-submit" id="loginBtn">
@@ -586,22 +621,30 @@ $csrfToken = generate_csrf_token();
         const captchaImg     = document.getElementById('captchaImage');
         const captchaLoading = document.getElementById('captchaLoading');
         const refreshBtn     = document.getElementById('refreshCaptcha');
+        const captchaInput   = document.getElementById('captcha');
+
+        let isLockoutActive = false;
 
         function loadCaptcha() {
+            if (!captchaImg || !captchaLoading) return;
             captchaLoading.style.display = 'flex';
             captchaImg.style.display = 'none';
             captchaImg.src = '/api/auth.php?action=captcha&_t=' + Date.now();
         }
 
-        captchaImg.onload  = function() {
-            captchaLoading.style.display = 'none';
-            captchaImg.style.display = 'block';
-        };
-        captchaImg.onerror = function() {
-            captchaLoading.innerHTML = '<span style="color:#dc2626;font-size:.7rem;">Gagal</span>';
-        };
+        if (captchaImg) {
+            captchaImg.onload  = function() {
+                if (captchaLoading) captchaLoading.style.display = 'none';
+                captchaImg.style.display = 'block';
+            };
+            captchaImg.onerror = function() {
+                if (captchaLoading) captchaLoading.innerHTML = '<span style="color:#dc2626;font-size:.7rem;">Gagal</span>';
+            };
+        }
 
-        refreshBtn.addEventListener('click', function(e) { e.preventDefault(); loadCaptcha(); });
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', function(e) { e.preventDefault(); loadCaptcha(); });
+        }
 
         // Toggle password
         const togglePassword = document.getElementById('togglePassword');
@@ -620,15 +663,49 @@ $csrfToken = generate_csrf_token();
         const errorAlert   = document.getElementById('errorAlert');
         const errorMessage = document.getElementById('errorMessage');
 
+        // Form validity check to enable/disable submit button
+        const usernameInput = document.getElementById('username');
+
+        function checkFormValidity() {
+            if (isLockoutActive) return;
+
+            const usernameVal = usernameInput.value.trim();
+            const passwordVal = passwordInput.value;
+            const captchaVal  = captchaInput ? captchaInput.value.trim() : '';
+
+            const isUsernameValid = usernameVal.length > 0;
+            const isPasswordValid = passwordVal.length > 0;
+            const isCaptchaValid  = !captchaInput || captchaVal.length > 0;
+
+            loginBtn.disabled = !(isUsernameValid && isPasswordValid && isCaptchaValid);
+        }
+
+        usernameInput.addEventListener('input', checkFormValidity);
+        passwordInput.addEventListener('input', checkFormValidity);
+        if (captchaInput) {
+            captchaInput.addEventListener('input', checkFormValidity);
+        }
+
+        // Run initially
+        checkFormValidity();
+
+        // Pengecekan lockout awal dari server
+        const initialLockoutRemaining = <?= (int) $lockoutTimeRemaining ?>;
+        if (initialLockoutRemaining > 0) {
+            showError("Terlalu banyak percobaan login gagal. Silakan coba lagi nanti.");
+            loginBtn.disabled = true;
+            startLockoutCountdown(initialLockoutRemaining, loginBtn, loginBtnText, loginSpinner);
+        }
+
         loginForm.addEventListener('submit', async function(e) {
             e.preventDefault();
 
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value;
-            const captcha  = document.getElementById('captcha').value.trim();
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value;
+            const captcha  = captchaInput ? captchaInput.value.trim() : '';
 
             // Validasi client-side
-            if (!username || !password || !captcha) {
+            if (!username || !password || (captchaInput && !captcha)) {
                 showError('Semua field harus diisi');
                 return;
             }
@@ -640,7 +717,7 @@ $csrfToken = generate_csrf_token();
                 showError('Password terlalu panjang (maks 200 karakter)');
                 return;
             }
-            if (captcha.length > 20) {
+            if (captchaInput && captcha.length > 20) {
                 showError('Captcha terlalu panjang');
                 return;
             }
@@ -648,7 +725,7 @@ $csrfToken = generate_csrf_token();
                 showError('Format username mengandung karakter tidak valid');
                 return;
             }
-            if (!/^[a-zA-Z0-9]+$/.test(captcha)) {
+            if (captchaInput && !/^[a-zA-Z0-9]+$/.test(captcha)) {
                 showError('Format captcha tidak valid (hanya huruf dan angka)');
                 return;
             }
@@ -687,22 +764,23 @@ $csrfToken = generate_csrf_token();
                 } else {
                     showError(result.message || 'Username, password, atau captcha salah');
                     loadCaptcha();
-                    document.getElementById('captcha').value = '';
-                    loginBtn.disabled = false;
+                    if (captchaInput) captchaInput.value = '';
                     loginSpinner.classList.add('d-none');
                     loginBtnText.innerHTML = '<i class="bi bi-shield-lock me-1"></i>Masuk ke PANTAU';
+                    checkFormValidity();
                 }
             } catch (error) {
                 showError('Gagal menghubungi server. Silakan coba kembali.');
                 loadCaptcha();
-                document.getElementById('captcha').value = '';
-                loginBtn.disabled = false;
+                if (captchaInput) captchaInput.value = '';
                 loginSpinner.classList.add('d-none');
                 loginBtnText.innerHTML = '<i class="bi bi-shield-lock me-1"></i>Masuk ke PANTAU';
+                checkFormValidity();
             }
         });
 
         function startLockoutCountdown(seconds, btn, btnText, spinner) {
+            isLockoutActive = true;
             spinner.classList.add('d-none');
             let remaining = seconds;
             function tick() {
@@ -710,8 +788,9 @@ $csrfToken = generate_csrf_token();
                 const s = remaining % 60;
                 btnText.innerHTML = `<i class="bi bi-lock-fill me-1"></i>Coba lagi dalam ${m}:${String(s).padStart(2,'0')}`;
                 if (remaining <= 0) {
-                    btn.disabled = false;
+                    isLockoutActive = false;
                     btnText.innerHTML = '<i class="bi bi-shield-lock me-1"></i>Masuk ke PANTAU';
+                    checkFormValidity();
                     return;
                 }
                 remaining--;
@@ -723,7 +802,9 @@ $csrfToken = generate_csrf_token();
         function showError(msg) { errorMessage.textContent = msg; errorAlert.style.display = 'block'; }
         function hideError()    { errorAlert.style.display = 'none'; }
 
-        loadCaptcha();
+        if (captchaImg) {
+            loadCaptcha();
+        }
     });
     </script>
 </body>

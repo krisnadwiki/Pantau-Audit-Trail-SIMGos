@@ -93,7 +93,7 @@ if ($action === 'captcha') {
     $captchaRaw  = trim($input['CAPTCHA'] ?? '');
 
     // Batas panjang karakter
-    if (strlen($loginRaw) > 100 || strlen($passwordRaw) > 200 || strlen($captchaRaw) > 20) {
+    if (strlen($loginRaw) > 100 || strlen($passwordRaw) > 200 || (APP_CAPTCHA && strlen($captchaRaw) > 20)) {
         json_response([
             'success' => false,
             'message' => 'Input melebihi batas yang diizinkan.'
@@ -101,10 +101,10 @@ if ($action === 'captcha') {
     }
 
     // Harus diisi
-    if (empty($loginRaw) || empty($passwordRaw) || empty($captchaRaw)) {
+    if (empty($loginRaw) || empty($passwordRaw) || (APP_CAPTCHA && empty($captchaRaw))) {
         json_response([
             'success' => false,
-            'message' => 'Username, password, dan captcha harus diisi'
+            'message' => APP_CAPTCHA ? 'Username, password, dan captcha harus diisi' : 'Username dan password harus diisi'
         ], 400);
     }
 
@@ -117,7 +117,7 @@ if ($action === 'captcha') {
     }
 
     // Validasi karakter captcha (hanya alfanumerik)
-    if (!preg_match('/^[a-zA-Z0-9]+$/', $captchaRaw)) {
+    if (APP_CAPTCHA && !preg_match('/^[a-zA-Z0-9]+$/', $captchaRaw)) {
         json_response([
             'success' => false,
             'message' => 'Format captcha tidak valid.'
