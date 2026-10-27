@@ -41,7 +41,7 @@ Platform monitoring terpadu untuk **audit trail**, **aktivitas pengguna**, dan *
 
 | Komponen   | Versi | Fungsi                   |
 | ---------- | ----- | ------------------------ |
-| PHP-Apache | 8.2+  | Web Server & PHP Runtime |
+| webdevops/php-apache | 8.3   | Web Server Apache & PHP 8.3 Runtime |
 | MySQL      | 8.0   | Database SIMGOS          |
 
 > Aplikasi ini berkomunikasi dengan **webservice SIMGOS** melalui REST API. Koneksi database digunakan sebagai fallback untuk query audit trail langsung.
@@ -155,6 +155,8 @@ pantau/
 ├── Dockerfile
 ├── .dockerignore
 ├── README.md
+├── docker/
+│   └── vhost-pantau.conf
 └── app/
     ├── .env
     ├── .env.example
@@ -227,15 +229,16 @@ Sesuaikan `API_BASE_URL`, `DB_HOST`, `DB_USER`, dan `DB_PASS` dengan environment
 
 # 5. Menjalankan Aplikasi
 
-Build image.
+Jalankan container (Docker Compose akan otomatis mengunduh image `webdevops/php-apache:8.3` yang sudah siap pakai):
+
+```bash
+docker compose up -d
+```
+
+*(Opsional) Jika ingin melakukan build lokal dari `Dockerfile`:*
 
 ```bash
 docker compose build
-```
-
-Jalankan container.
-
-```bash
 docker compose up -d
 ```
 
@@ -326,13 +329,23 @@ docker stats
 
 # 10. Update Aplikasi
 
+Tarik update kode terbaru dan perbarui Docker image:
+
 ```bash
 cd /opt/pantau
 
 git pull
 
-docker compose build --no-cache
+# Update image ke versi terbaru (patch keamanan & dependensi PHP 8.3)
+docker compose pull
 
+docker compose up -d
+```
+
+*(Opsional jika menggunakan build image lokal):*
+
+```bash
+docker compose build --no-cache
 docker compose up -d
 ```
 

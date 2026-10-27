@@ -1,15 +1,24 @@
 services:
   pantau:
     container_name: pantau-audit
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: webdevops/php-apache:8.3
+
+    # Opsi jika ingin build dari Dockerfile lokal:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
 
     ports:
       - "8082:80"
 
+    environment:
+      - WEB_DOCUMENT_ROOT=/app/public
+      - WEB_DOCUMENT_INDEX=index.php
+      - PHP_DATE_TIMEZONE=Asia/Jakarta
+
     volumes:
-      - ./app:/var/www/html/app
+      - ./app:/app
+      - ./docker/vhost-pantau.conf:/opt/docker/etc/httpd/vhost.common.d/pantau.conf:ro
 
     env_file:
       - app/.env

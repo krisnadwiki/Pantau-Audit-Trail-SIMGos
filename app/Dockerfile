@@ -1,13 +1,13 @@
-FROM php:8.3-apache
+FROM webdevops/php-apache:8.3
 
-# Enable mod_rewrite
-RUN a2enmod rewrite
+ENV WEB_DOCUMENT_ROOT=/app/public
+ENV WEB_DOCUMENT_INDEX=index.php
+ENV PHP_DATE_TIMEZONE=Asia/Jakarta
 
-# Install PHP extensions
-RUN docker-php-ext-install mysqli
+COPY apache.conf /opt/docker/etc/httpd/vhost.common.d/pantau.conf
 
-# Set custom Apache config
-COPY apache.conf /etc/apache2/sites-available/000-default.conf
+COPY . /app
 
-# Set working directory
-WORKDIR /var/www/html
+WORKDIR /app
+
+EXPOSE 80

@@ -1,38 +1,16 @@
-FROM php:8.3-apache
+FROM webdevops/php-apache:8.3
 
-# Install extensions & utilities
-RUN apt-get update && apt-get install -y \
-    curl \
-    git \
-    unzip \
-    zip \
-    libzip-dev \
-    && docker-php-ext-install zip pdo pdo_mysql \
-    && a2enmod rewrite \
-    && rm -rf /var/lib/apt/lists/*
+# Konfigurasi Apache & PHP Environment
+ENV WEB_DOCUMENT_ROOT=/app/public
+ENV WEB_DOCUMENT_INDEX=index.php
+ENV PHP_DATE_TIMEZONE=Asia/Jakarta
 
-# Set DocumentRoot to app/public
-RUN sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/app/public|g' \
-    /etc/apache2/sites-available/000-default.conf
+# Konfigurasi Apache vhost untuk alias /api dan rewrite
+COPY docker/vhost-pantau.conf /opt/docker/etc/httpd/vhost.common.d/pantau.conf
 
-# Allow .htaccess overrides for public/ and expose api/ folder
-RUN echo '<Directory /var/www/html/app/public>\n\
-    AllowOverride All\n\
-    Require all granted\n\
-    Options -Indexes +FollowSymLinks\n\
-</Directory>\n\
-Alias /api /var/www/html/app/api\n\
-<Directory /var/www/html/app/api>\n\
-    AllowOverride None\n\
-    Require all granted\n\
-    Options -Indexes +FollowSymLinks\n\
-</Directory>' >> /etc/apache2/sites-available/000-default.conf
+# Salin source code aplikasi
+COPY app /app
 
-# Enable mod_alias (needed for Alias directive)
-RUN a2enmod alias
-
-WORKDIR /var/www/html
+WORKDIR /app
 
 EXPOSE 80
-
-CMD ["apache2-foreground"]
