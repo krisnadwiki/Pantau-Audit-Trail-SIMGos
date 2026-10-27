@@ -22,6 +22,7 @@ services:
     volumes:
       - ./app:/app
       - ./docker/vhost-pantau.conf:/opt/docker/etc/httpd/vhost.common.d/pantau.conf:ro
+      - ./docker/security-global.conf:/opt/docker/etc/httpd/conf.d/security-global.conf:ro
 
     env_file:
       - app/.env

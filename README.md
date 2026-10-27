@@ -156,12 +156,14 @@ pantau/
 ├── .dockerignore
 ├── README.md
 ├── docker/
-│   └── vhost-pantau.conf
+│   ├── vhost-pantau.conf
+│   └── security-global.conf
 └── app/
     ├── .env
     ├── .env.example
     ├── Dockerfile
     ├── apache.conf
+    ├── security-global.conf
     ├── api/
     │   ├── audit.php
     │   └── auth.php

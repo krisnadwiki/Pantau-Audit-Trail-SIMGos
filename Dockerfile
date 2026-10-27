@@ -10,6 +10,7 @@ ENV PHP_DISPLAY_ERRORS=0
 ENV PHP_EXPOSE_PHP=0
 
 # Konfigurasi Apache vhost untuk alias /api, rewrite, dan proteksi file
+COPY docker/security-global.conf /opt/docker/etc/httpd/conf.d/security-global.conf
 COPY docker/vhost-pantau.conf /opt/docker/etc/httpd/vhost.common.d/pantau.conf
 
 # Salin source code aplikasi
