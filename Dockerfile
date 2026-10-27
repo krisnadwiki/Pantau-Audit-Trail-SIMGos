@@ -5,7 +5,11 @@ ENV WEB_DOCUMENT_ROOT=/app/public
 ENV WEB_DOCUMENT_INDEX=index.php
 ENV PHP_DATE_TIMEZONE=Asia/Jakarta
 
-# Konfigurasi Apache vhost untuk alias /api dan rewrite
+# Security Hardening: cegah kebocoran error dan info versi PHP
+ENV PHP_DISPLAY_ERRORS=0
+ENV PHP_EXPOSE_PHP=0
+
+# Konfigurasi Apache vhost untuk alias /api, rewrite, dan proteksi file
 COPY docker/vhost-pantau.conf /opt/docker/etc/httpd/vhost.common.d/pantau.conf
 
 # Salin source code aplikasi

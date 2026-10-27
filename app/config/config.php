@@ -21,17 +21,25 @@ define('LOGIN_LOCKOUT_SECONDS',(int)  env('LOGIN_LOCKOUT_SECONDS', 900)); // Loc
 
 // ── Session Hardening ──────────────────────────────────────────────────────
 if (session_status() === PHP_SESSION_NONE) {
+    // Deteksi koneksi aman (HTTPS / reverse proxy SSL termination)
+    $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443)
+        || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+
     // Konfigurasi session aman sebelum session_start()
-    ini_set('session.cookie_httponly',  '1');      // Cegah akses cookie via JS
-    ini_set('session.cookie_samesite',  'Lax');   // Lax: izinkan navigasi GET lintas-halaman (redirect login→dashboard)
+    ini_set('session.cookie_httponly',  '1');      // Cegah akses cookie via JS (XSS mitigation)
+    ini_set('session.cookie_samesite',  'Lax');    // Mitigasi CSRF lintas domain
     ini_set('session.use_strict_mode',  '1');      // Tolak session ID yang tidak diinisialisasi
-    ini_set('session.cookie_secure',    '0');      // Set ke 1 jika sudah menggunakan HTTPS
+    ini_set('session.cookie_secure',    $isSecure ? '1' : '0'); // Otomatis Secure saat HTTPS
     
     // Set maxlifetime sementara menggunakan nilai env
     $tempTimeout = (int) env('SESSION_TIMEOUT', 3600);
     ini_set('session.gc_maxlifetime',   (string) $tempTimeout);
     session_start();
 }
+
+// Kirim security headers untuk seluruh response (HTML, JSON, dll)
+send_security_headers();
 
 // Definisikan konstanta secara dinamis setelah session_start()
 $dynamicTimeout = (int) ($_SESSION['settings']['session_timeout'] ?? env('SESSION_TIMEOUT', 3600));

@@ -15,6 +15,9 @@ services:
       - WEB_DOCUMENT_ROOT=/app/public
       - WEB_DOCUMENT_INDEX=index.php
       - PHP_DATE_TIMEZONE=Asia/Jakarta
+      # Security Hardening: sembunyikan info PHP & jangan tampilkan error ke output browser
+      - PHP_DISPLAY_ERRORS=0
+      - PHP_EXPOSE_PHP=0
 
     volumes:
       - ./app:/app

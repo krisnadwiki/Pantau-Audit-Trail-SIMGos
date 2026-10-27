@@ -3,4 +3,17 @@
 README.md
 docker-compose.yml
 Dockerfile
-.env
+img/
+
+# Jangan sertakan file kredensial/environment ke dalam Docker image build
+**/.env
+**/.env.*
+!**/.env.example
+
+# File backup, log, dan database dump
+**/*.bak
+**/*.old
+**/*.save
+**/*.swp
+**/*.sql
+**/*.log

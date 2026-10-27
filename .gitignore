@@ -1,1 +1,15 @@
-.env
+# File environment & kredensial
+**/.env
+**/.env.*
+!**/.env.example
+
+# File backup dan temporary editor
+**/*.bak
+**/*.old
+**/*.save
+**/*.swp
+*~
+
+# Log dan database dump lokal
+**/*.log
+**/*.sql

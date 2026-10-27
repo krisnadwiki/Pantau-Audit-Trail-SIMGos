@@ -11,12 +11,23 @@ $activePage = 'settings';
 
 // Simpan/baca pengaturan dari session
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
+    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+        http_response_code(403);
+        die('Aksi ditolak: Token CSRF tidak valid atau kadaluarsa. Silakan muat ulang halaman.');
+    }
+
+    $allowedTimezones = ['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura', 'UTC'];
+    $tz = in_array($_POST['timezone'] ?? '', $allowedTimezones, true) ? $_POST['timezone'] : APP_TIMEZONE;
+
+    $allowedThemes = ['system', 'light', 'dark'];
+    $theme = in_array($_POST['theme'] ?? '', $allowedThemes, true) ? $_POST['theme'] : 'system';
+
     $_SESSION['settings'] = [
-        'timezone'        => $_POST['timezone']       ?? APP_TIMEZONE,
-        'session_timeout' => (int)($_POST['session_timeout'] ?? 3600),
-        'auto_refresh'    => isset($_POST['auto_refresh']) ? (int)$_POST['auto_refresh'] : 0,
-        'default_rows'    => (int)($_POST['default_rows'] ?? 50),
-        'theme'           => $_POST['theme'] ?? 'system',
+        'timezone'        => $tz,
+        'session_timeout' => max(300, min(86400, (int)($_POST['session_timeout'] ?? 3600))),
+        'auto_refresh'    => max(0, min(3600, (int)($_POST['auto_refresh'] ?? 0))),
+        'default_rows'    => max(10, min(500, (int)($_POST['default_rows'] ?? 50))),
+        'theme'           => $theme,
     ];
     $_SESSION['settings_saved'] = true;
     header('Location: /settings.php');
@@ -65,6 +76,7 @@ include __DIR__ . '/../templates/header.php';
                 <div class="col-lg-7">
                     <form method="POST">
                         <input type="hidden" name="save_settings" value="1">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generate_csrf_token()) ?>">
 
                         <!-- Tampilan -->
                         <div class="app-card mb-3">
@@ -225,7 +237,8 @@ include __DIR__ . '/../templates/header.php';
                                     $dbOk  = true;
                                     $dbMsg = 'Terhubung';
                                 } catch (Exception $e) {
-                                    $dbMsg = $e->getMessage();
+                                    $dbMsg = 'Koneksi gagal dieksekusi';
+                                    error_log('Settings DB test error: ' . $e->getMessage());
                                 }
                             } else {
                                 $dbMsg = DB_HOST ? 'Gagal terhubung' : 'Tidak dikonfigurasi';
